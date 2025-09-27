@@ -1,0 +1,158 @@
+--[[
+    WARNING: Heads up! This script has not been verified by ScriptBlox. Use at your own risk!
+]]
+
+-- SETTINGS
+local outerHitboxColor = Color3.fromRGB(0, 0, 255) -- Blue
+local outerHitboxTransparency = 0.5
+local headHitboxTransparency = 1 -- Fully invisible
+
+-- STATE
+local hitboxEnabled = false
+local hitboxSizeValue = 10 -- Default size (1–30)
+
+-- UI SETUP
+local player = game.Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Parent = playerGui
+
+-- Toggle button
+local button = Instance.new("TextButton")
+button.Size = UDim2.new(0, 150, 0, 50)
+button.Position = UDim2.new(0.05, 0, 0.75, 0)
+button.Text = "Hitbox: OFF"
+button.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+button.TextColor3 = Color3.fromRGB(255, 255, 255)
+button.Font = Enum.Font.SourceSansBold
+button.TextSize = 20
+button.Parent = screenGui
+
+-- Number input box
+local textBox = Instance.new("TextBox")
+textBox.Size = UDim2.new(0, 150, 0, 40)
+textBox.Position = UDim2.new(0.05, 0, 0.85, 0)
+textBox.Text = tostring(hitboxSizeValue)
+textBox.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+textBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+textBox.Font = Enum.Font.SourceSansBold
+textBox.TextSize = 20
+textBox.ClearTextOnFocus = false
+textBox.Parent = screenGui
+
+local label = Instance.new("TextLabel")
+label.Size = UDim2.new(0, 150, 0, 20)
+label.Position = UDim2.new(0.05, 0, 0.80, 0)
+label.Text = "Hitbox Size (1–30)"
+label.BackgroundTransparency = 1
+label.TextColor3 = Color3.fromRGB(255, 255, 255)
+label.Font = Enum.Font.SourceSansBold
+label.TextSize = 16
+label.Parent = screenGui
+
+-- CREATE OUTER HITBOX
+local function addOuterHitbox(zombie)
+    local hrp = zombie:FindFirstChild("HumanoidRootPart")
+    if hrp and not zombie:FindFirstChild("OuterHitbox") then
+        local part = Instance.new("Part")
+        part.Name = "OuterHitbox"
+        part.Size = Vector3.new(hitboxSizeValue, hitboxSizeValue, hitboxSizeValue)
+        part.Transparency = outerHitboxTransparency
+        part.Color = outerHitboxColor
+        part.Anchored = false
+        part.CanCollide = false
+        part.Massless = true
+        part.CFrame = hrp.CFrame
+        part.Parent = zombie
+
+        local weld = Instance.new("WeldConstraint")
+        weld.Part0 = hrp
+        weld.Part1 = part
+        weld.Parent = part
+    end
+end
+
+-- CREATE HEAD HITBOX
+local function addHeadHitbox(zombie)
+    local head = zombie:FindFirstChild("Head")
+    if head and not zombie:FindFirstChild("HeadHitbox") then
+        local part = Instance.new("Part")
+        part.Name = "HeadHitbox"
+        part.Size = Vector3.new(hitboxSizeValue/2, hitboxSizeValue/2, hitboxSizeValue/2)
+        part.Transparency = headHitboxTransparency
+        part.Color = Color3.fromRGB(255, 0, 0)
+        part.Anchored = false
+        part.CanCollide = false
+        part.Massless = true
+        part.CFrame = head.CFrame
+        part.Parent = zombie
+
+        local weld = Instance.new("WeldConstraint")
+        weld.Part0 = head
+        weld.Part1 = part
+        weld.Parent = part
+    end
+end
+
+-- REMOVE HITBOXES
+local function removeHitboxes(zombie)
+    if zombie:FindFirstChild("OuterHitbox") then zombie.OuterHitbox:Destroy() end
+    if zombie:FindFirstChild("HeadHitbox") then zombie.HeadHitbox:Destroy() end
+end
+
+-- UPDATE HITBOXES
+local function updateHitboxes(zombie)
+    if hitboxEnabled then
+        removeHitboxes(zombie)
+        addOuterHitbox(zombie)
+        addHeadHitbox(zombie)
+    else
+        removeHitboxes(zombie)
+    end
+end
+
+-- TOGGLE BUTTON
+button.MouseButton1Click:Connect(function()
+    hitboxEnabled = not hitboxEnabled
+    button.Text = "Hitbox: " .. (hitboxEnabled and "ON" or "OFF")
+
+    for _, zombie in pairs(workspace.Zombies:GetChildren()) do
+        updateHitboxes(zombie)
+    end
+    for _, zombie in pairs(workspace.Camera:GetChildren()) do
+        if zombie.Name == "m_Zombie" then
+            updateHitboxes(zombie)
+        end
+    end
+end)
+
+-- TEXTBOX INPUT HANDLER
+textBox.FocusLost:Connect(function(enterPressed)
+    local num = tonumber(textBox.Text)
+    if num and num >= 1 and num <= 30 then
+        hitboxSizeValue = num
+        textBox.Text = tostring(num)
+
+        if hitboxEnabled then
+            for _, zombie in pairs(workspace.Zombies:GetChildren()) do
+                updateHitboxes(zombie)
+            end
+            for _, zombie in pairs(workspace.Camera:GetChildren()) do
+                if zombie.Name == "m_Zombie" then
+                    updateHitboxes(zombie)
+                end
+            end
+        end
+    else
+        textBox.Text = tostring(hitboxSizeValue) -- reset if invalid
+    end
+end)
+
+-- NEW ZOMBIES
+workspace.Zombies.ChildAdded:Connect(updateHitboxes)
+workspace.Camera.ChildAdded:Connect(function(zombie)
+    if zombie.Name == "m_Zombie" then
+        updateHitboxes(zombie)
+    end
+end)
